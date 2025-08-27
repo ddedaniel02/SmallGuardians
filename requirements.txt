@@ -1,0 +1,11 @@
+numpy
+sentence-transformers
+scikit-learn
+transformers
+faiss-cpu
+polars
+bitsandbytes 
+accelerate
+datasets>=3.4.1
+huggingface_hub
+fsspec
