@@ -1,10 +1,9 @@
 from sentence_transformers import SentenceTransformer
 import numpy as np
-from xgboost import XGBClassifier
 from sentence_transformers import SentenceTransformer
 import joblib  # Para guardar/cargar el scaler
 
-class MLPClassifier:
+class MLPClassifierWrapper:
     def __init__(self, embedder):
         self.embedder = embedder
         self.mlp = joblib.load("MLPClassifier/model/mlp_model.pkl")

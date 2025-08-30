@@ -2,6 +2,7 @@ numpy
 sentence-transformers
 scikit-learn
 transformers
+torch
 faiss-cpu
 polars
 bitsandbytes 
@@ -9,3 +10,4 @@ accelerate
 datasets>=3.4.1
 huggingface_hub
 fsspec
+streamlit

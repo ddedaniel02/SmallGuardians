@@ -3,7 +3,6 @@ import pickle
 import faiss
 import numpy as np
 from datasets import load_dataset
-from sentence_transformers import SentenceTransformer
 
 
 class Embeddings:
@@ -58,8 +57,22 @@ class Embeddings:
   #     with open(EXAMPLES_EVALUATOR_PATH, "wb") as f:
   #         pickle.dump(self.evaluator_examples, f)
   # TO FINISH
+  @staticmethod
   def truncate(text, max_len=500):
-      return text if len(text) <= max_len else text[:max_len] + "..."
+      if text is None:
+          return ""
+      s = str(text)
+      if max_len <= 0:
+          return "…" if s else ""
+      if len(s) <= max_len:
+          return s
+      cut = s.rfind(" ", 0, max_len)
+      if cut != -1 and cut >= int(max_len * 0.6):
+          s = s[:cut]
+      else:
+          s = s[:max_len]
+      return s.rstrip() + "…"
+
 
 
   def retrieve_similar(self, task, prompt, k=1, return_distances=False):
@@ -69,14 +82,18 @@ class Embeddings:
         benign_distances, benign_index = self.classifier_benign_index.search(query_vec, k)
         if return_distances:
            return (malicious_distances, benign_distances)
-        return ([self.truncate(self.classifier_malicious_examples[i]) for i in malicious_index[0]], 
-         [self.truncate(self.classifier_benign_examples[i]) for i in benign_index[0]])
+        return (
+            [self.truncate(self.classifier_malicious_examples[int(i)]) for i in malicious_index[0] if i != -1],
+            [self.truncate(self.classifier_benign_examples[int(i)])    for i in benign_index[0]    if i != -1],
+        )
 
       elif task == "evaluator":
         malicious_distances, malicious_index = self.evaluator_malicious_index.search(query_vec, k)
         benign_distances, benign_index = self.evaluator_benign_index.search(query_vec, k)
         if return_distances:
           return (malicious_distances, benign_distances)
-        return ([self.truncate(self.evaluator_malicious_examples[i]) for i in malicious_index[0]], 
-         [self.truncate(self.evaluator_benign_examples[i]) for i in benign_index[0]])
+        return (
+            [self.truncate(self.evaluator_malicious_examples[int(i)]) for i in malicious_index[0] if i != -1],
+            [self.truncate(self.evaluator_benign_examples[int(i)])    for i in benign_index[0]    if i != -1],
+        )
 
