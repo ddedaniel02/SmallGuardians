@@ -8,7 +8,6 @@ SLMRAG CODE BLOCK
 class SLMRagWrapper:
     def __init__(self, embedder, model_name="HuggingFaceTB/SmolLM3-3B"):
         self.embedding = Embeddings(embedder)
-        self.embedding.load_examples()
         torch.cuda.empty_cache()
         self.pipe = pipeline(
             task="text-generation",

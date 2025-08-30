@@ -2,12 +2,13 @@ import os
 import pickle
 import faiss
 import numpy as np
-from datasets import load_dataset
+import pandas as pd
 
 
 class Embeddings:
   def __init__(self, embedder):
     self.embedder = embedder
+    self.load_examples()
 
   def reading_files(self, path):
     index_path = os.path.join(path, "index.faiss")
@@ -26,37 +27,7 @@ class Embeddings:
     self.evaluator_malicious_index, self.evaluator_malicious_examples = self.reading_files("evaluator/malicious")
     self.evaluator_benign_index, self.evaluator_benign_examples = self.reading_files("evaluator/benign")
 
-  # TO DO: CHANGE AND FIX THIS FUNCTION
-  # def add_corpus(self,task, dataset_name, split, prompt_column_name, label_column_name):
-  #   malicious_examples = []
-  #   benign_examples = []
-  #   dataset = load_dataset(dataset_name)
-  #   for row in dataset[split]:
-  #     new_corpus.append(row[prompt_column_name])
-  #     new_labels.append(row[label_column_name])
 
-  #   classifier_embeddings = self.embedder.encode(new_corpus, convert_to_numpy=True)
-  #   if task == "classifier":
-  #     self.classifier_examples.extend(new_corpus)
-  #     self.classifier_labels.extend(new_labels)
-  #     self.classifier_index.add(classifier_embeddings)
-
-  #     faiss.write_index(self.classifier_index, INDEX_CLASSIFIER_PATH)
-  #     with open(LABELS_CLASSIFIER_PATH, "wb") as f:
-  #         pickle.dump(self.classifier_labels, f)
-  #     with open(EXAMPLES_CLASSIFIER_PATH, "wb") as f:
-  #         pickle.dump(self.classifier_examples, f)
-  #   elif task == "evaluator":
-  #     self.evaluator_examples.extend(new_corpus)
-  #     self.evaluator_labels.extend(new_labels)
-  #     self.evaluator_index.add(classifier_embeddings)
-
-  #     faiss.write_index(self.evaluator_index, INDEX_EVALUATOR_PATH)
-  #     with open(LABELS_EVALUATOR_PATH, "wb") as f:
-  #         pickle.dump(self.evaluator_labels, f)
-  #     with open(EXAMPLES_EVALUATOR_PATH, "wb") as f:
-  #         pickle.dump(self.evaluator_examples, f)
-  # TO FINISH
   @staticmethod
   def truncate(text, max_len=500):
       if text is None:
@@ -73,7 +44,64 @@ class Embeddings:
           s = s[:max_len]
       return s.rstrip() + "…"
 
+  def add_corpus(self, dataset_path, task):
+      """
+      Add examples to the corpus from the dataset_path. The required columns are 'input' and 'classification'. 
+      Classification must be boolean variables (1 for Jailbreak and 0 for Benign)
+      Args:
+          dataset_path (str): Path to the dataset (csv/json/parquet).
+          task (str): Examples come from the 'classifier' or 'evaluator' task.
+      """
 
+      ext = os.path.splitext(dataset_path)[1].lower()
+      if ext == ".csv":
+          df = pd.read_csv(dataset_path)
+      elif ext == ".json":
+          df = pd.read_json(dataset_path)
+      elif ext == ".parquet":
+          df = pd.read_parquet(dataset_path)
+      else:
+          raise ValueError("Format not supported. Use csv, json or parquet.")
+
+      if not {"input", "classification"}.issubset(df.columns):
+          raise ValueError("The dataset must have 'input' and 'classification' columns.")
+
+      if task == "classifier":
+         malicious_index = self.classifier_malicious_index
+         benign_index = self.classifier_benign_index
+         malicious_examples = self.classifier_malicious_examples
+         benign_examples = self.classifier_benign_examples
+      elif task == "evaluator":
+         malicious_index = self.evaluator_malicious_index
+         benign_index = self.evaluator_benign_index
+         malicious_examples = self.evaluator_malicious_examples
+         benign_examples = self.evaluator_benign_examples
+      else:
+         raise ValueError("Task must be 'classifier' or 'evaluator'.")
+      malicious_inputs = df[df["classification"] == 1]["input"].tolist()
+      benign_inputs = df[df["classification"] == 0]["input"].tolist()
+
+      if len(malicious_inputs) > 0:
+          malicious_embedder = self.embedder.encode(malicious_inputs, convert_to_numpy=True)
+          malicious_index.add(np.array(malicious_embedder, dtype=np.float32))
+          malicious_examples.extend(malicious_inputs)
+          write_path_malicious_index = f"{task}/malicious/index.faiss"
+          faiss.write_index(malicious_index, write_path_malicious_index)
+          write_path_malicious_example = f"{task}/malicious/examples.pkl"
+          with open(write_path_malicious_example, "wb") as f:
+              pickle.dump(malicious_examples, f)
+
+      if len(benign_inputs) > 0:
+          benign_embedder = self.embedder.encode(benign_inputs, convert_to_numpy=True)
+          benign_index.add(np.array(benign_embedder, dtype=np.float32))
+          benign_examples.extend(benign_inputs)
+          write_path_benign_index = f"{task}/benign/index.faiss"
+          faiss.write_index(benign_index, write_path_benign_index)
+          write_path_benign_example = f"{task}/benign/examples.pkl"
+          with open(write_path_benign_example, "wb") as f:
+              pickle.dump(benign_examples, f)
+
+      self.load_examples()
 
   def retrieve_similar(self, task, prompt, k=1, return_distances=False):
       query_vec = self.embedder.encode([prompt], convert_to_numpy=True)

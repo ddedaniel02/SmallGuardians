@@ -63,7 +63,7 @@ class SmallGuardians:
         if classification.upper() == "JAILBREAK":
             return response, self._defend(example, defense_method,"SLMRAG")
         if classification.upper() == "TOXIC":
-            defense_method = "blocking"
+            defense_method = "default_response"
             return response, self._defend(example, defense_method,"SLMRAG")
         return response, example
 
